@@ -33,8 +33,8 @@ import "github.com/goravel/sqlite"
 ```
 // config/database.go
 import (
-    "github.com/goravel/framework/contracts/database"
-    "github.com/goravel/framework/contracts/database/orm"
+    "github.com/goravel/framework/contracts/database/driver"
+    "github.com/goravel/sqlite/contracts"
     sqlitefacades "github.com/goravel/sqlite/facades"
 )
 
@@ -44,15 +44,15 @@ import (
         "database": config.Env("DB_DATABASE", "forge"),
         "prefix":   "",
         "singular": false,
-        "via": func() (orm.Driver, error) {
+        "via": func() (driver.Driver, error) {
             return sqlitefacades.Sqlite("sqlite"), nil
         },
         // Optional
-        "read": []database.Config{
+        "read": []contracts.Config{
             {Database: "forge"},
         },
         // Optional
-        "write": []database.Config{
+        "write": []contracts.Config{
             {Database: "forge"},
         },
     },
