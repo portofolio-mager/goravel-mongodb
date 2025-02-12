@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"database/sql"
 	"fmt"
 
 	"github.com/goravel/framework/contracts/config"
@@ -38,6 +39,7 @@ func (r *Sqlite) Config() database.Config {
 
 	return database.Config{
 		Connection: writers[0].Connection,
+		Dsn:        writers[0].Dsn,
 		Database:   writers[0].Database,
 		Driver:     Name,
 		Prefix:     writers[0].Prefix,
@@ -45,10 +47,19 @@ func (r *Sqlite) Config() database.Config {
 	}
 }
 
+func (r *Sqlite) DB() (*sql.DB, error) {
+	gormDB, _, err := r.Gorm()
+	if err != nil {
+		return nil, err
+	}
+
+	return gormDB.DB()
+}
+
 func (r *Sqlite) Docker() (docker.DatabaseDriver, error) {
 	writers := r.config.Writes()
 	if len(writers) == 0 {
-		return nil, errors.OrmDatabaseConfigNotFound
+		return nil, errors.DatabaseConfigNotFound
 	}
 
 	return NewDocker(writers[0].Database), nil
