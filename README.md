@@ -48,10 +48,10 @@ import (
             return sqlitefacades.Sqlite("sqlite")
         },
         // Optional
+        "dsn": "",
         "read": []contracts.Config{
             {Database: "forge"},
         },
-        // Optional
         "write": []contracts.Config{
             {Database: "forge"},
         },
