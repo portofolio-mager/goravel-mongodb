@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 // TestDialectorInitialization tests that our MongoDB dialector initializes correctly
@@ -127,4 +128,38 @@ func TestMongoDBDialectorCompatibility(t *testing.T) {
 	}, "SQL DB operations should not panic")
 
 	t.Logf("SUCCESS: MongoDB dialector provides valid connection pool with embedded sql.DB")
+}
+
+// TestInstanceDBMethod tests the exact framework issue: instance.DB() returning "invalid db"
+// This is the critical test that verifies our GetDBConnector implementation works
+func TestInstanceDBMethod(t *testing.T) {
+	// Create MongoDB dialector - same as framework would do
+	dialector := Open("mongodb://localhost:27017/testdb")
+	require.NotNil(t, dialector)
+
+	// Initialize GORM instance - same as framework would do
+	instance, err := gorm.Open(dialector, &gorm.Config{})
+	require.NoError(t, err, "GORM initialization should succeed")
+	require.NotNil(t, instance)
+
+	// This is the exact call that was failing in the framework:
+	// db, err := instance.DB()
+	// if err != nil { return nil, err } // Was returning "invalid db"
+	db, err := instance.DB()
+
+	// These assertions verify our fix works
+	assert.NoError(t, err, "instance.DB() should NOT return 'invalid db' error")
+	assert.NotNil(t, db, "instance.DB() should return valid *sql.DB, not nil")
+
+	// Verify it's actually a *sql.DB type
+	assert.IsType(t, (*sql.DB)(nil), db)
+
+	// Test that we can use the returned sql.DB
+	assert.NotPanics(t, func() {
+		stats := db.Stats()
+		assert.NotNil(t, stats)
+	}, "Returned *sql.DB should be usable")
+
+	t.Logf("✅ SUCCESS: instance.DB() returned valid *sql.DB: %p", db)
+	t.Logf("✅ Framework issue RESOLVED: No more 'invalid db' error!")
 }

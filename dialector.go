@@ -128,6 +128,12 @@ func (r *mongoRows) Next(dest []driver.Value) error {
 // gorm.ConnPool interface is automatically satisfied by embedding *sql.DB
 // No need to implement individual methods since *sql.DB already implements them
 
+// GetDBConn implements GetDBConnector interface that GORM's DB() method expects
+// This allows GORM to extract the underlying *sql.DB from our connection pool
+func (m *mongoConnPool) GetDBConn() (*sql.DB, error) {
+	return m.DB, nil
+}
+
 // Open opens a GORM dialector from a data source name.
 func Open(dsn string) gorm.Dialector {
 	return &Dialector{DSN: dsn}
