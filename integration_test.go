@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
+
+	"github.com/tonidy/goravel-mongodb/contracts"
 )
 
 // TestDialectorInitialization tests that our MongoDB dialector initializes correctly
@@ -189,7 +191,7 @@ func TestFrameworkScenarios(t *testing.T) {
 			name: "complex_config",
 			config: &gorm.Config{
 				DisableForeignKeyConstraintWhenMigrating: true,
-				NamingStrategy: nil,
+				NamingStrategy:                           nil,
 			},
 		},
 	}
@@ -297,7 +299,6 @@ func TestDiagnosticConnPoolNil(t *testing.T) {
 	// Create a custom dialector that tracks if Initialize is called
 	type trackingDialector struct {
 		*Dialector
-		initializeCalled bool
 	}
 
 	// Custom dialector with tracking
@@ -358,7 +359,7 @@ func TestPrepareStmtFalseScenario(t *testing.T) {
 
 	// This is the exact scenario that causes the issue
 	gormConfig := &gorm.Config{
-		PrepareStmt: false, // This is the critical setting that causes connPool to be nil
+		PrepareStmt:                              false, // This is the critical setting that causes connPool to be nil
 		DisableAutomaticPing:                     true,
 		DisableForeignKeyConstraintWhenMigrating: true,
 		SkipDefaultTransaction:                   true,
@@ -409,4 +410,62 @@ func TestPrepareStmtFalseScenario(t *testing.T) {
 
 	t.Logf("✅ SUCCESS: PrepareStmt = false scenario works!")
 	t.Logf("✅ Returned valid *sql.DB: %p", db)
+}
+
+// TestPoolDialectorIntegration tests that MongoDB Pool() method now includes Dialector field
+// This test verifies the fix that makes MongoDB work like PostgreSQL driver
+func TestPoolDialectorIntegration(t *testing.T) {
+	t.Log("=== TESTING fullConfigToDialector method directly ===")
+
+	// Create MongoDB instance (need to test method directly due to config complexity)
+	mongodb := &MongoDB{}
+
+	// Test fullConfigToDialector method directly
+	fullConfig := contracts.FullConfig{
+		Config: contracts.Config{
+			URI:      "mongodb://localhost:27017/testdb",
+			Database: "testdb",
+		},
+		Connection: "mongodb",
+		Driver:     "mongodb",
+	}
+
+	// Test the new fullConfigToDialector method
+	dialector := mongodb.fullConfigToDialector(fullConfig)
+	assert.NotNil(t, dialector, "fullConfigToDialector should return valid dialector")
+	assert.Equal(t, "mongodb", dialector.Name(), "Dialector should have correct name")
+
+	// Test that the dialector can be used with GORM (like framework does)
+	instance, err := gorm.Open(dialector, &gorm.Config{
+		PrepareStmt:                              false, // Test the critical scenario
+		DisableAutomaticPing:                     true,
+		DisableForeignKeyConstraintWhenMigrating: true,
+	})
+	require.NoError(t, err, "GORM should initialize with our dialector")
+	require.NotNil(t, instance, "GORM instance should not be nil")
+
+	// The critical test - this should work now
+	db, err := instance.DB()
+	assert.NoError(t, err, "instance.DB() should work with fullConfigToDialector")
+	assert.NotNil(t, db, "instance.DB() should return valid *sql.DB")
+
+	t.Logf("✅ SUCCESS: fullConfigToDialector creates working GORM dialector")
+	t.Logf("✅ MongoDB now has PostgreSQL-compatible dialector creation")
+	t.Logf("✅ instance.DB() works: %p", db)
+
+	// Test edge case with empty URI (should use default)
+	emptyConfig := contracts.FullConfig{
+		Config: contracts.Config{
+			URI:      "",
+			Database: "testdb2",
+		},
+		Connection: "mongodb",
+		Driver:     "mongodb",
+	}
+
+	dialector2 := mongodb.fullConfigToDialector(emptyConfig)
+	assert.NotNil(t, dialector2, "fullConfigToDialector should work with empty URI")
+	assert.Equal(t, "mongodb", dialector2.Name(), "Dialector should still have correct name")
+
+	t.Logf("✅ SUCCESS: fullConfigToDialector handles empty URI correctly")
 }

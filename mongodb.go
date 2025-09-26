@@ -13,6 +13,7 @@ import (
 	"github.com/goravel/framework/errors"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"gorm.io/gorm"
 
 	"github.com/tonidy/goravel-mongodb/contracts"
 )
@@ -181,6 +182,16 @@ func (m *MongoDB) Close() error {
 	return m.client.Disconnect(ctx)
 }
 
+// fullConfigToDialector creates a GORM dialector for MongoDB (similar to PostgreSQL implementation)
+func (m *MongoDB) fullConfigToDialector(config contracts.FullConfig) gorm.Dialector {
+	// Create DSN from MongoDB URI
+	dsn := config.URI
+	if dsn == "" {
+		dsn = "mongodb://localhost:27017/" + config.Database
+	}
+	return Open(dsn)
+}
+
 func (m *MongoDB) fullConfigsToConfigs(fullConfigs []contracts.FullConfig) []database.Config {
 	configs := make([]database.Config, len(fullConfigs))
 	for i, fullConfig := range fullConfigs {
@@ -188,6 +199,7 @@ func (m *MongoDB) fullConfigsToConfigs(fullConfigs []contracts.FullConfig) []dat
 			Connection: fullConfig.Connection,
 			Database:   fullConfig.Database,
 			Driver:     Name,
+			Dialector:  m.fullConfigToDialector(fullConfig),
 		}
 	}
 	return configs
