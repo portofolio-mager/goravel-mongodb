@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -142,6 +143,12 @@ func TestInstanceDBMethod(t *testing.T) {
 	require.NoError(t, err, "GORM initialization should succeed")
 	require.NotNil(t, instance)
 
+	// Debug: Check if ConnPool is nil (this is what's causing the issue)
+	t.Logf("Debug: instance.ConnPool = %v", instance.ConnPool)
+	if instance.ConnPool == nil {
+		t.Fatal("PROBLEM FOUND: instance.ConnPool is nil!")
+	}
+
 	// This is the exact call that was failing in the framework:
 	// db, err := instance.DB()
 	// if err != nil { return nil, err } // Was returning "invalid db"
@@ -162,4 +169,120 @@ func TestInstanceDBMethod(t *testing.T) {
 
 	t.Logf("✅ SUCCESS: instance.DB() returned valid *sql.DB: %p", db)
 	t.Logf("✅ Framework issue RESOLVED: No more 'invalid db' error!")
+}
+
+// TestFrameworkScenarios tests different ways the framework might initialize GORM
+func TestFrameworkScenarios(t *testing.T) {
+	scenarios := []struct {
+		name   string
+		config *gorm.Config
+	}{
+		{
+			name:   "default_config",
+			config: &gorm.Config{},
+		},
+		{
+			name:   "nil_config",
+			config: nil,
+		},
+		{
+			name: "complex_config",
+			config: &gorm.Config{
+				DisableForeignKeyConstraintWhenMigrating: true,
+				NamingStrategy: nil,
+			},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			dialector := Open("mongodb://localhost:27017/testdb")
+
+			var instance *gorm.DB
+			var err error
+
+			if scenario.config == nil {
+				instance, err = gorm.Open(dialector)
+			} else {
+				instance, err = gorm.Open(dialector, scenario.config)
+			}
+
+			require.NoError(t, err, "GORM should initialize successfully")
+			require.NotNil(t, instance, "GORM instance should not be nil")
+
+			// Check if ConnPool is set
+			t.Logf("Scenario %s: instance.ConnPool = %v", scenario.name, instance.ConnPool)
+			if instance.ConnPool == nil {
+				t.Errorf("PROBLEM: ConnPool is nil in scenario %s", scenario.name)
+				return
+			}
+
+			// Test DB() method
+			db, err := instance.DB()
+			t.Logf("Scenario %s: DB() returned err=%v, db=%p", scenario.name, err, db)
+
+			assert.NoError(t, err, "instance.DB() should work in scenario %s", scenario.name)
+			assert.NotNil(t, db, "DB should not be nil in scenario %s", scenario.name)
+		})
+	}
+}
+
+// TestGoravelBuildOrmPattern tests the exact pattern used by Goravel's BuildGorm method
+// This reproduces the exact scenario where instance.DB() was failing in the framework
+func TestGoravelBuildOrmPattern(t *testing.T) {
+	// Simulate Goravel's BuildGorm method pattern
+
+	// Step 1: Create gormConfig similar to Goravel
+	gormConfig := &gorm.Config{
+		DisableAutomaticPing:                     true,
+		DisableForeignKeyConstraintWhenMigrating: true,
+		SkipDefaultTransaction:                   true,
+		Logger:                                   nil, // Using nil like framework might
+	}
+
+	// Step 2: Create dialector (this is pool.Writers[0].Dialector in Goravel)
+	dialector := Open("mongodb://localhost:27017/testdb")
+
+	// Step 3: Open GORM instance exactly like Goravel does
+	instance, err := gorm.Open(dialector, gormConfig)
+	require.NoError(t, err, "gorm.Open should succeed (like in Goravel)")
+	require.NotNil(t, instance, "GORM instance should not be nil")
+
+	// Step 4: Test the Ping functionality (Goravel does this)
+	if pinger, ok := instance.ConnPool.(interface{ Ping() error }); ok {
+		err := pinger.Ping()
+		t.Logf("Ping result: %v (this is expected with dummy driver)", err)
+	} else {
+		t.Logf("ConnPool doesn't support Ping interface")
+	}
+
+	// Step 5: This is the CRITICAL part - the exact code from Goravel that was failing
+	// if len(pool.Writers) == 1 && len(pool.Readers) == 0 {
+	//     db, err := instance.DB()  // THIS WAS FAILING
+	//     if err != nil {
+	//         return nil, err
+	//     }
+	// }
+
+	t.Logf("About to call instance.DB() - the critical call that was failing...")
+
+	db, err := instance.DB()
+
+	// These are the assertions that verify our fix for Goravel
+	assert.NoError(t, err, "instance.DB() should NOT fail in Goravel BuildGorm pattern")
+	assert.NotNil(t, db, "instance.DB() should return valid *sql.DB for Goravel")
+
+	if db != nil {
+		// Step 6: Test the connection pool settings that Goravel applies
+		assert.NotPanics(t, func() {
+			db.SetMaxIdleConns(10)
+			db.SetMaxOpenConns(100)
+			db.SetConnMaxIdleTime(3600 * time.Second)
+			db.SetConnMaxLifetime(3600 * time.Second)
+		}, "Should be able to set connection pool settings like Goravel does")
+
+		t.Logf("✅ SUCCESS: Goravel BuildGorm pattern works!")
+		t.Logf("✅ instance.DB() returned valid *sql.DB: %p", db)
+		t.Logf("✅ Connection pool settings applied successfully")
+	}
 }

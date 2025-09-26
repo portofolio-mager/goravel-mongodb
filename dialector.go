@@ -5,6 +5,7 @@ package mongodb
 import (
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"strconv"
 	"sync"
 
@@ -131,6 +132,12 @@ func (r *mongoRows) Next(dest []driver.Value) error {
 // GetDBConn implements GetDBConnector interface that GORM's DB() method expects
 // This allows GORM to extract the underlying *sql.DB from our connection pool
 func (m *mongoConnPool) GetDBConn() (*sql.DB, error) {
+	if m == nil {
+		return nil, errors.New("mongoConnPool is nil")
+	}
+	if m.DB == nil {
+		return nil, errors.New("embedded sql.DB is nil")
+	}
 	return m.DB, nil
 }
 
@@ -158,11 +165,23 @@ func (dialector Dialector) Initialize(db *gorm.DB) (err error) {
 			return err
 		}
 
-		// Set both the connection pool AND the underlying sql.DB
+		// Ensure the connection pool is not nil
+		if connPool == nil {
+			return errors.New("failed to create MongoDB connection pool")
+		}
+
+		// Set the connection pool on the GORM DB instance
 		db.ConnPool = connPool
 
-		// The mongoConnPool embeds *sql.DB directly, so GORM should be able to
-		// access it through type assertion or the ConnPool interface
+		// Double-check that it was set correctly
+		if db.ConnPool == nil {
+			return errors.New("failed to set connection pool on GORM DB")
+		}
+
+		// Also set on Config for compatibility
+		if db.Config != nil {
+			db.Config.ConnPool = connPool
+		}
 	}
 
 	callbacks.RegisterDefaultCallbacks(db, &callbacks.Config{
