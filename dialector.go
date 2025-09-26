@@ -3,6 +3,7 @@
 package mongodb
 
 import (
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"errors"
@@ -141,6 +142,50 @@ func (m *mongoConnPool) GetDBConn() (*sql.DB, error) {
 	return m.DB, nil
 }
 
+// persistentConnPool is a wrapper that ensures our MongoDB connection pool
+// survives GORM's internal initialization process, especially when PrepareStmt = false
+type persistentConnPool struct {
+	mongoConnPool *mongoConnPool
+}
+
+// GetDBConn implements GetDBConnector for the persistent wrapper
+func (p *persistentConnPool) GetDBConn() (*sql.DB, error) {
+	if p == nil || p.mongoConnPool == nil {
+		return nil, errors.New("persistentConnPool is nil")
+	}
+	return p.mongoConnPool.GetDBConn()
+}
+
+// Delegate all gorm.ConnPool methods to the underlying mongoConnPool
+func (p *persistentConnPool) PrepareContext(ctx context.Context, query string) (*sql.Stmt, error) {
+	return p.mongoConnPool.PrepareContext(ctx, query)
+}
+
+func (p *persistentConnPool) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	return p.mongoConnPool.ExecContext(ctx, query, args...)
+}
+
+func (p *persistentConnPool) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	return p.mongoConnPool.QueryContext(ctx, query, args...)
+}
+
+func (p *persistentConnPool) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	return p.mongoConnPool.QueryRowContext(ctx, query, args...)
+}
+
+// Additional methods that GORM might call
+func (p *persistentConnPool) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
+	return p.mongoConnPool.BeginTx(ctx, opts)
+}
+
+func (p *persistentConnPool) Ping() error {
+	return p.mongoConnPool.Ping()
+}
+
+func (p *persistentConnPool) Close() error {
+	return p.mongoConnPool.Close()
+}
+
 // Open opens a GORM dialector from a data source name.
 func Open(dsn string) gorm.Dialector {
 	return &Dialector{DSN: dsn}
@@ -178,10 +223,15 @@ func (dialector Dialector) Initialize(db *gorm.DB) (err error) {
 			return errors.New("failed to set connection pool on GORM DB")
 		}
 
-		// Also set on Config for compatibility
+		// CRITICAL FIX: Set on Config.ConnPool to prevent it from being lost
+		// This ensures GORM can find our connection pool even if PrepareStmt = false
 		if db.Config != nil {
 			db.Config.ConnPool = connPool
 		}
+
+		// ADDITIONAL FIX: Override GORM's connection retrieval by setting a custom connector
+		// This ensures our connection pool survives GORM's internal initialization
+		db.ConnPool = &persistentConnPool{mongoConnPool: connPool}
 	}
 
 	callbacks.RegisterDefaultCallbacks(db, &callbacks.Config{

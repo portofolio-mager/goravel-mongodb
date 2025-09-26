@@ -286,3 +286,127 @@ func TestGoravelBuildOrmPattern(t *testing.T) {
 		t.Logf("✅ Connection pool settings applied successfully")
 	}
 }
+
+// TestDiagnosticConnPoolNil diagnoses why db.ConnPool might be nil in Goravel
+func TestDiagnosticConnPoolNil(t *testing.T) {
+	t.Log("=== DIAGNOSTIC: Checking why db.ConnPool might be nil ===")
+
+	// Test 1: Check if dialector Initialize method is being called
+	dialector := Open("mongodb://localhost:27017/testdb")
+
+	// Create a custom dialector that tracks if Initialize is called
+	type trackingDialector struct {
+		*Dialector
+		initializeCalled bool
+	}
+
+	// Custom dialector with tracking
+	customDialector := &trackingDialector{Dialector: dialector.(*Dialector)}
+
+	// Test with minimal config (like Goravel might use)
+	instance, err := gorm.Open(customDialector, &gorm.Config{
+		DisableAutomaticPing: true,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, instance)
+
+	// Test 2: Check current state
+	t.Logf("Current db.ConnPool = %v", instance.ConnPool)
+	t.Logf("Current db.Config = %v", instance.Config)
+	if instance.Config != nil {
+		t.Logf("Current db.Config.ConnPool = %v", instance.Config.ConnPool)
+	}
+
+	// Test 3: Check Statement
+	if instance.Statement != nil {
+		t.Logf("Current db.Statement.ConnPool = %v", instance.Statement.ConnPool)
+	} else {
+		t.Log("db.Statement is nil")
+	}
+
+	// Test 4: Try the exact DB() call logic
+	t.Log("\n=== Simulating GORM DB() method logic ===")
+
+	connPool := instance.ConnPool
+	if instance.Statement != nil && instance.Statement.ConnPool != nil {
+		connPool = instance.Statement.ConnPool
+		t.Log("Using Statement.ConnPool")
+	} else {
+		t.Log("Using main ConnPool")
+	}
+
+	t.Logf("Final connPool to check = %v", connPool)
+
+	if connPool == nil {
+		t.Fatal("❌ PROBLEM CONFIRMED: connPool is nil - this will cause ErrInvalidDB")
+	}
+
+	// Test the actual DB() call
+	db, err := instance.DB()
+	if err != nil {
+		t.Fatalf("❌ DB() failed with error: %v", err)
+	}
+
+	t.Logf("✅ DB() succeeded, returned: %p", db)
+}
+
+// TestPrepareStmtFalseScenario tests the specific issue where PrepareStmt = false
+// This reproduces the exact condition that causes connPool to be nil
+func TestPrepareStmtFalseScenario(t *testing.T) {
+	t.Log("=== TESTING PrepareStmt = false SCENARIO ===")
+
+	// This is the exact scenario that causes the issue
+	gormConfig := &gorm.Config{
+		PrepareStmt: false, // This is the critical setting that causes connPool to be nil
+		DisableAutomaticPing:                     true,
+		DisableForeignKeyConstraintWhenMigrating: true,
+		SkipDefaultTransaction:                   true,
+		Logger:                                   nil,
+	}
+
+	dialector := Open("mongodb://localhost:27017/testdb")
+
+	t.Log("Opening GORM with PrepareStmt = false...")
+	instance, err := gorm.Open(dialector, gormConfig)
+	require.NoError(t, err, "GORM should initialize successfully")
+	require.NotNil(t, instance, "GORM instance should not be nil")
+
+	// Debug the state
+	t.Logf("After GORM initialization:")
+	t.Logf("  db.ConnPool = %v", instance.ConnPool)
+	t.Logf("  db.Config.ConnPool = %v", instance.Config.ConnPool)
+
+	if instance.Statement != nil {
+		t.Logf("  db.Statement.ConnPool = %v", instance.Statement.ConnPool)
+	} else {
+		t.Log("  db.Statement is nil")
+	}
+
+	// This is the critical test - the call that was failing in Goravel
+	t.Log("Calling instance.DB()...")
+	db, err := instance.DB()
+
+	// Verify our fix works
+	assert.NoError(t, err, "instance.DB() should work even with PrepareStmt = false")
+	assert.NotNil(t, db, "instance.DB() should return valid *sql.DB")
+
+	if err != nil {
+		t.Fatalf("❌ FAILED: instance.DB() returned error: %v", err)
+	}
+
+	if db == nil {
+		t.Fatal("❌ FAILED: instance.DB() returned nil")
+	}
+
+	// Test that it works like Goravel expects
+	assert.NotPanics(t, func() {
+		db.SetMaxIdleConns(10)
+		db.SetMaxOpenConns(100)
+		stats := db.Stats()
+		assert.NotNil(t, stats)
+	}, "Should work with connection pool operations")
+
+	t.Logf("✅ SUCCESS: PrepareStmt = false scenario works!")
+	t.Logf("✅ Returned valid *sql.DB: %p", db)
+}
