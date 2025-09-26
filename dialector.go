@@ -3,6 +3,8 @@
 package mongodb
 
 import (
+	"context"
+	"database/sql"
 	"strconv"
 
 	"gorm.io/gorm"
@@ -15,6 +17,26 @@ import (
 type Dialector struct {
 	DSN  string
 	Conn gorm.ConnPool
+}
+
+// dummyConnPool is a minimal implementation of gorm.ConnPool for MongoDB
+// MongoDB operations will use the native MongoDB driver directly
+type dummyConnPool struct{}
+
+func (d *dummyConnPool) PrepareContext(ctx context.Context, query string) (*sql.Stmt, error) {
+	return nil, gorm.ErrNotImplemented
+}
+
+func (d *dummyConnPool) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+	return nil, gorm.ErrNotImplemented
+}
+
+func (d *dummyConnPool) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+	return nil, gorm.ErrNotImplemented
+}
+
+func (d *dummyConnPool) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
+	return nil
 }
 
 // Open opens a GORM dialector from a data source name.
@@ -35,8 +57,10 @@ func (dialector Dialector) Initialize(db *gorm.DB) (err error) {
 	if dialector.Conn != nil {
 		db.ConnPool = dialector.Conn
 	} else {
-		// For MongoDB, we don't use SQL connections
-		return gorm.ErrInvalidDB
+		// For MongoDB, we don't use SQL connection pools like other GORM dialectors
+		// We'll handle connections through the native MongoDB driver
+		// Set a dummy connection to satisfy GORM requirements
+		db.ConnPool = &dummyConnPool{}
 	}
 
 	callbacks.RegisterDefaultCallbacks(db, &callbacks.Config{
