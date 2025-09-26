@@ -1,11 +1,10 @@
-package sqlite
+package mongodb
 
 import (
 	"fmt"
 
 	"github.com/goravel/framework/contracts/config"
-
-	"github.com/goravel/sqlite/contracts"
+	"github.com/tonidy/goravel-mongodb/contracts"
 )
 
 type Config struct {
@@ -55,26 +54,35 @@ func (r *Config) fillDefault(configs []contracts.Config) []contracts.FullConfig 
 	var fullConfigs []contracts.FullConfig
 	for _, config := range configs {
 		fullConfig := contracts.FullConfig{
-			Config:      config,
-			Connection:  r.connection,
-			Driver:      Name,
-			NoLowerCase: r.config.GetBool(fmt.Sprintf("database.connections.%s.no_lower_case", r.connection)),
-			Prefix:      r.config.GetString(fmt.Sprintf("database.connections.%s.prefix", r.connection)),
-			Singular:    r.config.GetBool(fmt.Sprintf("database.connections.%s.singular", r.connection)),
-		}
-		if nameReplacer := r.config.Get(fmt.Sprintf("database.connections.%s.name_replacer", r.connection)); nameReplacer != nil {
-			if replacer, ok := nameReplacer.(contracts.Replacer); ok {
-				fullConfig.NameReplacer = replacer
-			}
+			Config: contracts.Config{
+				URI:            config.URI,
+				Database:       config.Database,
+				Username:       config.Username,
+				Password:       config.Password,
+				AuthSource:     config.AuthSource,
+				ReplicaSet:     config.ReplicaSet,
+				TLS:            config.TLS,
+				TLSCAFile:      config.TLSCAFile,
+				TLSCertFile:    config.TLSCertFile,
+				TLSKeyFile:     config.TLSKeyFile,
+				MaxPoolSize:    config.MaxPoolSize,
+				MinPoolSize:    config.MinPoolSize,
+				ConnectTimeout: config.ConnectTimeout,
+				ServerTimeout:  config.ServerTimeout,
+				Options:        config.Options,
+			},
+			Connection: r.connection,
+			Driver:     Name,
 		}
 
-		// If read or write is empty, use the default config
-		if fullConfig.Dsn == "" {
-			fullConfig.Dsn = r.config.GetString(fmt.Sprintf("database.connections.%s.dsn", r.connection))
+		// If read or write is empty, use the default config - only fill required fields
+		if fullConfig.URI == "" {
+			fullConfig.URI = r.config.GetString(fmt.Sprintf("database.connections.%s.uri", r.connection))
 		}
 		if fullConfig.Database == "" {
 			fullConfig.Database = r.config.GetString(fmt.Sprintf("database.connections.%s.database", r.connection))
 		}
+
 		fullConfigs = append(fullConfigs, fullConfig)
 	}
 

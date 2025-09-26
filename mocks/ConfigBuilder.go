@@ -4,7 +4,7 @@ package contracts
 
 import (
 	config "github.com/goravel/framework/contracts/config"
-	contracts "github.com/goravel/sqlite/contracts"
+	contracts "github.com/tonidy/goravel-mongodb/contracts"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -110,53 +110,6 @@ func (_c *ConfigBuilder_Connection_Call) Return(_a0 string) *ConfigBuilder_Conne
 }
 
 func (_c *ConfigBuilder_Connection_Call) RunAndReturn(run func() string) *ConfigBuilder_Connection_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// Readers provides a mock function with no fields
-func (_m *ConfigBuilder) Readers() []contracts.FullConfig {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for Readers")
-	}
-
-	var r0 []contracts.FullConfig
-	if rf, ok := ret.Get(0).(func() []contracts.FullConfig); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]contracts.FullConfig)
-		}
-	}
-
-	return r0
-}
-
-// ConfigBuilder_Readers_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Readers'
-type ConfigBuilder_Readers_Call struct {
-	*mock.Call
-}
-
-// Readers is a helper method to define mock.On call
-func (_e *ConfigBuilder_Expecter) Readers() *ConfigBuilder_Readers_Call {
-	return &ConfigBuilder_Readers_Call{Call: _e.mock.On("Readers")}
-}
-
-func (_c *ConfigBuilder_Readers_Call) Run(run func()) *ConfigBuilder_Readers_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *ConfigBuilder_Readers_Call) Return(_a0 []contracts.FullConfig) *ConfigBuilder_Readers_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *ConfigBuilder_Readers_Call) RunAndReturn(run func() []contracts.FullConfig) *ConfigBuilder_Readers_Call {
 	_c.Call.Return(run)
 	return _c
 }

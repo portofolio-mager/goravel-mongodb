@@ -1,4 +1,4 @@
-package sqlite
+package mongodb
 
 import (
 	"github.com/goravel/framework/contracts/binding"
@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	Binding = "goravel.sqlite"
-	Name    = "SQLite"
+	Binding = "goravel.mongodb"
+	Name    = "mongodb"
 )
 
 var App foundation.Application
@@ -27,7 +27,6 @@ func (r *ServiceProvider) Relationship() binding.Relationship {
 		},
 		ProvideFor: []string{
 			binding.DB,
-			binding.Orm,
 		},
 	}
 }
@@ -46,7 +45,7 @@ func (r *ServiceProvider) Register(app foundation.Application) {
 			return nil, errors.LogFacadeNotSet.SetModule(Name)
 		}
 
-		return NewSqlite(config, log, parameters["connection"].(string)), nil
+		return NewMongoDB(config, log, parameters["connection"].(string)), nil
 	})
 }
 

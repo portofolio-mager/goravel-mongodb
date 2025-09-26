@@ -1,6 +1,6 @@
-// Copy from https://github.com/ncruces/go-sqlite3/blob/main/gormlite/sqlite.go, only modify the Explain function to use single quote.
+// MongoDB dialector for GORM integration
 
-package sqlite
+package mongodb
 
 import (
 	"strconv"
@@ -10,8 +10,6 @@ import (
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
 	"gorm.io/gorm/schema"
-
-	"github.com/ncruces/go-sqlite3/driver"
 )
 
 type Dialector struct {
@@ -30,18 +28,15 @@ func OpenDB(db gorm.ConnPool) gorm.Dialector {
 }
 
 func (dialector Dialector) Name() string {
-	return "sqlite"
+	return "mongodb"
 }
 
 func (dialector Dialector) Initialize(db *gorm.DB) (err error) {
 	if dialector.Conn != nil {
 		db.ConnPool = dialector.Conn
 	} else {
-		conn, err := driver.Open(dialector.DSN)
-		if err != nil {
-			return err
-		}
-		db.ConnPool = conn
+		// For MongoDB, we don't use SQL connections
+		return gorm.ErrInvalidDB
 	}
 
 	callbacks.RegisterDefaultCallbacks(db, &callbacks.Config{
