@@ -3,9 +3,10 @@
 package mongodb
 
 import (
-	"context"
 	"database/sql"
+	"database/sql/driver"
 	"strconv"
+	"sync"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/callbacks"
@@ -19,25 +20,113 @@ type Dialector struct {
 	Conn gorm.ConnPool
 }
 
-// dummyConnPool is a minimal implementation of gorm.ConnPool for MongoDB
-// MongoDB operations will use the native MongoDB driver directly
-type dummyConnPool struct{}
-
-func (d *dummyConnPool) PrepareContext(ctx context.Context, query string) (*sql.Stmt, error) {
-	return nil, gorm.ErrNotImplemented
+// mongoConnPool is a ConnPool implementation for MongoDB that satisfies GORM's interface
+// while redirecting operations to use the native MongoDB driver
+type mongoConnPool struct {
+	*sql.DB
 }
 
-func (d *dummyConnPool) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-	return nil, gorm.ErrNotImplemented
+var (
+	driverOnce sync.Once
+	driverName = "mongodb-dummy"
+)
+
+// newMongoConnPool creates a new MongoDB connection pool with a minimal SQL DB implementation
+func newMongoConnPool() (*mongoConnPool, error) {
+	// Register a custom driver that does nothing but satisfies the interface
+	// Use sync.Once to avoid conflicts during testing
+	driverOnce.Do(func() {
+		sql.Register(driverName, &mongoDriver{})
+	})
+
+	db, err := sql.Open(driverName, "dummy")
+	if err != nil {
+		return nil, err
+	}
+
+	return &mongoConnPool{DB: db}, nil
 }
 
-func (d *dummyConnPool) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-	return nil, gorm.ErrNotImplemented
+// mongoDriver is a minimal sql/driver.Driver implementation for MongoDB compatibility
+type mongoDriver struct{}
+
+func (d *mongoDriver) Open(name string) (driver.Conn, error) {
+	return &mongoConn{}, nil
 }
 
-func (d *dummyConnPool) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
+// mongoConn is a minimal sql/driver.Conn implementation
+type mongoConn struct{}
+
+func (c *mongoConn) Prepare(query string) (driver.Stmt, error) {
+	return &mongoStmt{}, nil
+}
+
+func (c *mongoConn) Close() error {
 	return nil
 }
+
+func (c *mongoConn) Begin() (driver.Tx, error) {
+	return &mongoTx{}, nil
+}
+
+// mongoStmt is a minimal sql/driver.Stmt implementation
+type mongoStmt struct{}
+
+func (s *mongoStmt) Close() error {
+	return nil
+}
+
+func (s *mongoStmt) NumInput() int {
+	return 0
+}
+
+func (s *mongoStmt) Exec(args []driver.Value) (driver.Result, error) {
+	return &mongoResult{}, nil
+}
+
+func (s *mongoStmt) Query(args []driver.Value) (driver.Rows, error) {
+	return &mongoRows{}, nil
+}
+
+// mongoTx is a minimal sql/driver.Tx implementation
+type mongoTx struct{}
+
+func (t *mongoTx) Commit() error {
+	return nil
+}
+
+func (t *mongoTx) Rollback() error {
+	return nil
+}
+
+// mongoResult is a minimal sql/driver.Result implementation
+type mongoResult struct{}
+
+func (r *mongoResult) LastInsertId() (int64, error) {
+	return 0, nil
+}
+
+func (r *mongoResult) RowsAffected() (int64, error) {
+	return 0, nil
+}
+
+// mongoRows is a minimal sql/driver.Rows implementation
+type mongoRows struct{}
+
+func (r *mongoRows) Columns() []string {
+	return []string{}
+}
+
+func (r *mongoRows) Close() error {
+	return nil
+}
+
+func (r *mongoRows) Next(dest []driver.Value) error {
+	return nil
+}
+
+// gorm.ConnPool interface is automatically satisfied by embedding *sql.DB
+// No need to implement individual methods since *sql.DB already implements them
 
 // Open opens a GORM dialector from a data source name.
 func Open(dsn string) gorm.Dialector {
@@ -57,10 +146,17 @@ func (dialector Dialector) Initialize(db *gorm.DB) (err error) {
 	if dialector.Conn != nil {
 		db.ConnPool = dialector.Conn
 	} else {
-		// For MongoDB, we don't use SQL connection pools like other GORM dialectors
-		// We'll handle connections through the native MongoDB driver
-		// Set a dummy connection to satisfy GORM requirements
-		db.ConnPool = &dummyConnPool{}
+		// For MongoDB, create a minimal SQL DB that satisfies GORM's requirements
+		connPool, err := newMongoConnPool()
+		if err != nil {
+			return err
+		}
+
+		// Set both the connection pool AND the underlying sql.DB
+		db.ConnPool = connPool
+
+		// The mongoConnPool embeds *sql.DB directly, so GORM should be able to
+		// access it through type assertion or the ConnPool interface
 	}
 
 	callbacks.RegisterDefaultCallbacks(db, &callbacks.Config{
