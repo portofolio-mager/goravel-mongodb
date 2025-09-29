@@ -105,6 +105,28 @@ err := collection.
     Find(&users)
 ```
 
+### Native Facade Helpers
+
+```go
+import (
+    // If you also import Goravel core facades, consider aliasing:
+    // mongodbfacades "github.com/tonidy/goravel-mongodb/facades"
+    "github.com/tonidy/goravel-mongodb/facades"
+)
+
+// Native MongoDB client (*mongo.Client)
+nativeClient, err := facades.NativeClient()                    // uses connection "mongodb"
+nativeClientAlt, err := facades.NativeClient("analytics")     // specify connection
+
+// Native MongoDB database (*mongo.Database)
+nativeDB, err := facades.NativeDatabase("myapp")              // default connection
+nativeDBAlt, err := facades.NativeDatabase("myapp", "analytics")
+
+// Native MongoDB collection (*mongo.Collection)
+nativeCol, err := facades.NativeCollection("users")           // uses configured default database
+nativeColAlt, err := facades.NativeCollection("users", "other_db")
+```
+
 ### Advanced Features
 
 ```go
