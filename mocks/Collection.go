@@ -3,8 +3,8 @@
 package contracts
 
 import (
+	contracts "github.com/portofolio-mager/goravel-mongodb/contracts"
 	mock "github.com/stretchr/testify/mock"
-	contracts "github.com/tonidy/goravel-mongodb/contracts"
 
 	mongo "go.mongodb.org/mongo-driver/mongo"
 )

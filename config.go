@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/goravel/framework/contracts/config"
-	"github.com/tonidy/goravel-mongodb/contracts"
+	"github.com/portofolio-mager/goravel-mongodb/contracts"
 )
 
 type Config struct {

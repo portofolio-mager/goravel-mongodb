@@ -15,7 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"gorm.io/gorm"
 
-	"github.com/tonidy/goravel-mongodb/contracts"
+	"github.com/portofolio-mager/goravel-mongodb/contracts"
 )
 
 var _ driver.Driver = &MongoDB{}

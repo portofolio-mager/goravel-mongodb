@@ -4,7 +4,7 @@ package contracts
 
 import (
 	config "github.com/goravel/framework/contracts/config"
-	contracts "github.com/tonidy/goravel-mongodb/contracts"
+	contracts "github.com/portofolio-mager/goravel-mongodb/contracts"
 
 	mock "github.com/stretchr/testify/mock"
 )

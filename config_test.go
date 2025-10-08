@@ -7,7 +7,7 @@ import (
 	mocksconfig "github.com/goravel/framework/mocks/config"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/tonidy/goravel-mongodb/contracts"
+	"github.com/portofolio-mager/goravel-mongodb/contracts"
 )
 
 type ConfigTestSuite struct {

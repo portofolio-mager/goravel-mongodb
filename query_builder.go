@@ -9,7 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/tonidy/goravel-mongodb/contracts"
+	"github.com/portofolio-mager/goravel-mongodb/contracts"
 )
 
 var _ contracts.QueryBuilder = &QueryBuilder{}

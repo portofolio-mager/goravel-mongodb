@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 
-	"github.com/tonidy/goravel-mongodb/contracts"
+	"github.com/portofolio-mager/goravel-mongodb/contracts"
 )
 
 // TestDialectorInitialization tests that our MongoDB dialector initializes correctly

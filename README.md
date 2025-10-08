@@ -21,7 +21,7 @@ The MongoDB driver for Goravel framework, providing native MongoDB operations wi
 Run the command below in your project to install the package automatically:
 
 ```bash
-./artisan package:install github.com/tonidy/goravel-mongodb
+./artisan package:install github.com/portofolio-mager/goravel-mongodb
 ```
 
 Or check [the setup file](./setup/setup.go) to install the package manually.
@@ -54,7 +54,7 @@ Add MongoDB connection to your `config/database.go`:
 ### Direct MongoDB Operations
 
 ```go
-import "github.com/tonidy/goravel-mongodb/facades"
+import "github.com/portofolio-mager/goravel-mongodb/facades"
 
 // Get MongoDB client directly
 client, _ := facades.MongoDB("mongodb")
@@ -110,8 +110,8 @@ err := collection.
 ```go
 import (
     // If you also import Goravel core facades, consider aliasing:
-    // mongodbfacades "github.com/tonidy/goravel-mongodb/facades"
-    "github.com/tonidy/goravel-mongodb/facades"
+    // mongodbfacades "github.com/portofolio-mager/goravel-mongodb/facades"
+    "github.com/portofolio-mager/goravel-mongodb/facades"
 )
 
 // Native MongoDB client (*mongo.Client)

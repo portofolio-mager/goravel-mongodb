@@ -1,4 +1,4 @@
-module github.com/tonidy/goravel-mongodb
+module github.com/portofolio-mager/goravel-mongodb
 
 go 1.24.0
 

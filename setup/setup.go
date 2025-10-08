@@ -30,7 +30,7 @@ func main() {
 				Find(match.Imports()).Modify(modify.AddImport(packages.GetModulePath())).
 				Find(match.Providers()).Modify(modify.Register("&mongodb.ServiceProvider{}", "&database.ServiceProvider{}")),
 			modify.GoFile(path.Config("database.go")).
-				Find(match.Imports()).Modify(modify.AddImport("github.com/goravel/framework/contracts/database/driver"), modify.AddImport("github.com/tonidy/goravel-mongodb/facades", "mongodbfacades")).
+				Find(match.Imports()).Modify(modify.AddImport("github.com/goravel/framework/contracts/database/driver"), modify.AddImport("github.com/portofolio-mager/goravel-mongodb/facades", "mongodbfacades")).
 				Find(match.Config("database.connections")).Modify(modify.AddConfig("mongodb", config)),
 		).
 		Uninstall(
@@ -39,7 +39,7 @@ func main() {
 				Find(match.Imports()).Modify(modify.RemoveImport(packages.GetModulePath())),
 			modify.GoFile(path.Config("database.go")).
 				Find(match.Config("database.connections")).Modify(modify.RemoveConfig("mongodb")).
-				Find(match.Imports()).Modify(modify.RemoveImport("github.com/goravel/framework/contracts/database/driver"), modify.RemoveImport("github.com/tonidy/goravel-mongodb/facades", "mongodbfacades")),
+				Find(match.Imports()).Modify(modify.RemoveImport("github.com/goravel/framework/contracts/database/driver"), modify.RemoveImport("github.com/portofolio-mager/goravel-mongodb/facades", "mongodbfacades")),
 		).
 		Execute()
 }
